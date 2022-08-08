@@ -1,0 +1,107 @@
+import "../derw-packages/derw-lang/stdlib/src/List" as List
+
+type Step =
+    Instruction { text: string }
+    | TimedInstruction { time: number,
+        text: string }
+    | ParentInstruction { text: string,
+        steps: List Step }
+
+type Part =
+    Piece
+    | Weight
+
+type alias Recipe = {
+    name: string,
+    steps: List Step
+}
+
+showStep: Step -> number -> string
+showStep step index =
+    case step of
+        Instruction { text } ->
+            `${index}. ${text}`
+
+        TimedInstruction { text, time } ->
+            `${index}. ${text} for ${time} minutes`
+
+        ParentInstruction { text, steps } ->
+            let
+                childrenInstructions: string
+                childrenInstructions =
+                    List.indexedMap showStep steps
+                        |> List.map (\line -> "    " + line)
+                        |> (\y -> y.join "\n")
+            in
+                `${index}. ${text}\n${childrenInstructions}`
+
+showRecipe: Recipe -> any
+showRecipe recipe =
+    do
+        console.log `How to cook: ${recipe.name}`
+
+        steps: string
+        steps =
+            List.indexedMap showStep recipe.steps
+                |> (\y -> y.join "\n")
+
+        console.log steps
+    return
+        null
+
+cut: string -> number -> Part -> Step
+cut what amount part =
+    let
+        partStr: string
+        partStr =
+            case part of
+                Piece ->
+                    if amount == 1 then
+                        "piece"
+                    else
+                        "pieces"
+
+                Weight ->
+                    "kg"
+    in
+        Instruction { text: `Cut ${amount} ${partStr} of ${what}` }
+
+lasange: Recipe
+lasange =
+    {
+        name: "Lasange",
+        steps: [
+        Instruction { text: "Heat a large frying pan to mark 7 with some oil" },
+        ParentInstruction {
+            text: "Cut the vegetables",
+            steps: [
+            cut "Onions" 1 Piece,
+            cut "Garlic cloves" 2 Piece,
+            cut "Carrots" 3 Piece,
+            cut "Red peppers" 2 Piece,
+            cut "Celery" 3 Piece,
+            cut "Mushrooms" 10 Piece,
+            cut "Brocoli" 0.5 Piece
+        ]
+        },
+        TimedInstruction {
+            text: "Put the vegetables into the pan in the same order as cutting",
+            time: 10
+        },
+        Instruction { text: "Heat the oven to 200c" },
+        Instruction { text: "Cut up 3 sausages into small pieces" },
+        TimedInstruction {
+            text: "Add the sausages and mince beef to the pan",
+            time: 10
+        },
+        Instruction { text: "Add crushed tomatoes, use some water to rinse the tomato container and pour it into the frying pan" },
+        Instruction { text: "Put lasange sheets above the frying pan so that the steam softens them up" },
+        Instruction { text: "Put the sheets into a glass dish, covering all the surface. Add the sauce mix with some cheese and cream cheese. Add additional cheese on the top. Use as many cheeses as you have available" },
+        Instruction { text: "Put glass dish into the oven, and add garlic bread" },
+        Instruction { text: "Remove from oven when cheese is melted and browned" }
+    ]
+    }
+
+main: any
+main =
+    showRecipe lasange

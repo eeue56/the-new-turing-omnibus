@@ -1,0 +1,7 @@
+{
+    "name": "chapter-1",
+    "exposing": [],
+    "dependencies": {
+        "derw-lang/stdlib": "main"
+    }
+}
