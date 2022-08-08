@@ -1,0 +1,102 @@
+import "../derw-packages/derw-lang/stdlib/src/List" as List
+import "./Math_kernel" as Kernel
+
+type Cell =
+    Zero
+    | One
+    | Two
+
+corna: number
+corna =
+    10
+
+cornb: number
+cornb =
+    0.4
+
+side: number
+side =
+    10
+
+cell: number -> number -> Cell
+cell i j =
+    let
+        dividedSide: number
+        dividedSide =
+            side / 100
+
+        iSide: number
+        iSide =
+            i * side
+
+        x: number
+        x =
+            corna + iSide
+
+        jSide: number
+        jSide =
+            j * side
+
+        y: number
+        y =
+            cornb + jSide
+
+        doubleX: number
+        doubleX =
+            x * x
+
+        doubleY: number
+        doubleY =
+            y * y
+
+        trunc: number
+        trunc =
+            Math.trunc (doubleX + doubleY)
+
+        modded: number
+        modded =
+            Kernel.mod trunc 3
+    in
+        case `${modded}` of
+            "0" ->
+                Zero
+
+            "1" ->
+                One
+
+            default ->
+                Two
+
+makeGrid: List (List Cell)
+makeGrid =
+    List.indexedMap (\i -> List.indexedMap (\j -> cell i j) [ 1..100 ]) [ 1..100 ]
+
+showCell: Cell -> string
+showCell cell =
+    case cell of
+        Zero ->
+            " "
+
+        One ->
+            "X"
+
+        Two ->
+            "O"
+
+showGrid: List (List Cell) -> any
+showGrid grid =
+    do
+        joinedGrid: string
+        joinedGrid =
+            List.map (\row -> List.map showCell row) grid
+                |> List.map (\y -> y.join "")
+                |> (\y -> y.join "\n")
+
+        console.log joinedGrid
+    return
+        null
+
+main: any
+main =
+    makeGrid
+        |> showGrid
