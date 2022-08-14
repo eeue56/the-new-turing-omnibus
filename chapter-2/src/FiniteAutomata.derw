@@ -1,0 +1,526 @@
+import "../derw-packages/derw-lang/stdlib/src/List" as List
+import "../derw-packages/derw-lang/stdlib/src/Maybe" as Maybe exposing ( Just, Nothing )
+
+exposing (Symbols, Symbol, Group, Error, Either)
+
+exposing (Token, OpenParens, CloseParens, Star, Char, Whitespace, Add)
+
+exposing (tokenize, parse, validate)
+
+exposing (Infinite, Once)
+
+exposing (Result, Ok, Err)
+
+exposing (splitOnToplevelAdd, mergePattern, possiblePatterns)
+
+type RepeatPattern =
+    Infinite
+    | Once
+
+type Symbols =
+    Symbol { symbol: string }
+    | Group { symbols: List Symbols,
+        repeat: RepeatPattern }
+    | Error { message: string }
+    | Either { left: List Symbols,
+        right: List Symbols }
+
+type Token =
+    OpenParens
+    | CloseParens
+    | Star
+    | Char { char: string }
+    | Add
+    | Whitespace
+
+tokenizeByChar: List string -> List Token
+tokenizeByChar chars =
+    case chars of
+        [] ->
+            [ ]
+
+        char :: rest ->
+            let
+                token: Token
+                token =
+                    case char of
+                        "(" ->
+                            OpenParens
+
+                        ")" ->
+                            CloseParens
+
+                        "*" ->
+                            Star
+
+                        "+" ->
+                            Add
+
+                        " " ->
+                            Whitespace
+
+                        default ->
+                            Char { char: char }
+            in
+                token :: tokenizeByChar rest
+
+        default ->
+            [ ]
+
+tokenize: string -> List Token
+tokenize string =
+    tokenizeByChar (string.split "")
+
+symbolToString: Symbols -> string
+symbolToString currentSymbol =
+    case currentSymbol of
+        Symbol { symbol } ->
+            symbol
+
+        Group { symbols, repeat } ->
+            case repeat of
+                Once ->
+                    `(${symbolsToString(symbols)})`
+
+                Infinite ->
+                    `(${symbolsToString(symbols)})*`
+
+        Error ->
+            ""
+
+        Either { left, right } ->
+            `${symbolsToString(left)} + ${symbolsToString(right)}`
+
+symbolsToString: List Symbols -> string
+symbolsToString symbols =
+    List.map symbolToString symbols
+        |> (\y -> y.join "")
+
+type alias ParseInfo = {
+    groupedSymbols: List Symbols
+}
+
+type alias Split = {
+    left: List Token,
+    right: List Token
+}
+
+splitOnToplevelAddHelp: List Token -> boolean -> Split
+splitOnToplevelAddHelp tokens isInGroup =
+    if isInGroup then
+        case tokens of
+            CloseParens :: rest ->
+                let
+                    next: Split
+                    next =
+                        splitOnToplevelAddHelp rest false
+                in
+                    {
+                        left: CloseParens :: next.left,
+                        right: next.right
+                    }
+
+            x :: rest ->
+                let
+                    next: Split
+                    next =
+                        splitOnToplevelAddHelp rest true
+                in
+                    {
+                        left: x :: next.left,
+                        right: next.right
+                    }
+
+            default ->
+                {
+                    left: [ ],
+                    right: [ ]
+                }
+    else
+        case tokens of
+            Add :: rest ->
+                {
+                    left: [ ],
+                    right: rest
+                }
+
+            OpenParens :: rest ->
+                let
+                    next: Split
+                    next =
+                        splitOnToplevelAddHelp rest true
+                in
+                    {
+                        left: OpenParens :: next.left,
+                        right: next.right
+                    }
+
+            x :: rest ->
+                let
+                    next: Split
+                    next =
+                        splitOnToplevelAddHelp rest false
+                in
+                    {
+                        left: x :: next.left,
+                        right: next.right
+                    }
+
+            default ->
+                {
+                    left: [ ],
+                    right: [ ]
+                }
+
+splitOnToplevelAdd: List Token -> Split
+splitOnToplevelAdd tokens =
+    splitOnToplevelAddHelp tokens false
+
+upToCloseParens: List Token -> Split
+upToCloseParens tokens =
+    case tokens of
+        CloseParens :: Star :: rest ->
+            {
+                left: [ ],
+                right: rest
+            }
+
+        x :: rest ->
+            let
+                next: Split
+                next =
+                    upToCloseParens rest
+            in
+                {
+                    left: x :: next.left,
+                    right: next.right
+                }
+
+        default ->
+            {
+                left: [ ],
+                right: [ ]
+            }
+
+parseHelp: ParseInfo -> List Token -> List Symbols
+parseHelp info tokens =
+    case tokens of
+        [] ->
+            [ ]
+
+        token :: rest ->
+            case token of
+                OpenParens ->
+                    let
+                        withoutCloseParens: Split
+                        withoutCloseParens =
+                            upToCloseParens rest
+
+                        left: List Symbols
+                        left =
+                            [ Group {
+                                symbols: parseSplit withoutCloseParens.left,
+                                repeat: Infinite
+                            } ]
+
+                        farRight: List Symbols
+                        farRight =
+                            parseHelp { groupedSymbols: [ ] } withoutCloseParens.right
+                    in
+                        List.append left farRight
+
+                CloseParens ->
+                    case rest of
+                        Star :: allTheRest ->
+                            Group {
+                                symbols: info.groupedSymbols,
+                                repeat: Infinite
+                            } :: parseHelp { groupedSymbols: [ ] } allTheRest
+
+                        default ->
+                            Group {
+                                symbols: info.groupedSymbols,
+                                repeat: Once
+                            } :: parseHelp { groupedSymbols: [ ] } rest
+
+                Char { char } ->
+                    Symbol { symbol: char } :: parseHelp { groupedSymbols: [ ] } rest
+
+                Whitespace ->
+                    parseHelp info rest
+
+                Add ->
+                    [ Either {
+                        left: [ ],
+                        right: parseHelp info rest
+                    } ]
+
+        default ->
+            [ ]
+
+parseSplit: List Token -> List Symbols
+parseSplit tokens =
+    let
+        split: Split
+        split =
+            splitOnToplevelAdd tokens
+    in
+        case split.right of
+            [] ->
+                parseHelp { groupedSymbols: [ ] } split.left
+
+            default ->
+                [ Either {
+                    left: parseHelp { groupedSymbols: [ ] } split.left,
+                    right: parseHelp { groupedSymbols: [ ] } split.right
+                } ]
+
+parse: string -> List Symbols
+parse string =
+    let
+        tokens: List Token
+        tokens =
+            tokenize string
+    in
+        parseSplit tokens
+
+type Result =
+    Err { error: string }
+    | Ok { value: string }
+
+type alias GroupInfo = {
+    symbols: List Symbols,
+    repeat: RepeatPattern
+}
+
+isSimpleGroup: List Symbols -> boolean
+isSimpleGroup symbols =
+    case symbols of
+        head :: rest ->
+            case head of
+                Symbol ->
+                    isSimpleGroup rest
+
+                default ->
+                    false
+
+        default ->
+            true
+
+mergePattern: List string -> List (List string) -> List (List string)
+mergePattern prefix patterns =
+    case patterns of
+        [] ->
+            [ ]
+
+        pattern :: rest ->
+            let
+                prefixed: List string
+                prefixed =
+                    List.append prefix pattern
+            in
+                prefixed :: mergePattern prefix rest
+
+        default ->
+            [ ]
+
+getNext: List Symbols -> List (List string)
+getNext rest =
+    let
+        next: List (List string)
+        next =
+            possiblePatterns rest
+    in
+        case next of
+            [] ->
+                [ [ ] ]
+
+            default ->
+                next
+
+possiblePatterns: List Symbols -> List (List string)
+possiblePatterns symbols =
+    case symbols of
+        [] ->
+            [ ]
+
+        currentSymbol :: rest ->
+            case currentSymbol of
+                Symbol { symbol } ->
+                    let
+                        next: List (List string)
+                        next =
+                            possiblePatterns rest
+                    in
+                        case next of
+                            [] ->
+                                [ [ symbol ] ]
+
+                            default ->
+                                List.map (\y -> List.append [ symbol ] y) next
+
+                Either { left, right } ->
+                    let
+                        next: List (List string)
+                        next =
+                            getNext rest
+
+                        nextLeft: List (List string)
+                        nextLeft =
+                            possiblePatterns left
+
+                        nextRight: List (List string)
+                        nextRight =
+                            possiblePatterns right
+
+                        merger: List string -> List (List string)
+                        merger prefix =
+                            mergePattern prefix next
+
+                        leftPatterns: List (List string)
+                        leftPatterns =
+                            List.foldl (\a xs -> List.append (merger a) xs) [ ] nextLeft
+
+                        rightPatterns: List (List string)
+                        rightPatterns =
+                            List.foldl (\a xs -> List.append (merger a) xs) [ ] nextRight
+                    in
+                        List.append leftPatterns rightPatterns
+
+                Error ->
+                    [ ]
+
+                Group ->
+                    [ ]
+
+                default ->
+                    [ ]
+
+        default ->
+            [ ]
+
+doesPatternMatch: List string -> string -> boolean
+doesPatternMatch patternToTest stringifiedSymbols =
+    if patternToTest.length < stringifiedSymbols.length then
+        false
+    else
+        let
+            nChars: List string
+            nChars =
+                patternToTest.slice 0 stringifiedSymbols.length
+        in
+            if `${nChars.join("")}` == stringifiedSymbols then
+                true
+            else
+                false
+
+upToGroupEndHelp: List string -> List Symbols -> RepeatPattern -> List string
+upToGroupEndHelp patternToTest symbols repeat =
+    if isSimpleGroup symbols then
+        if doesPatternMatch patternToTest (symbolsToString symbols) then
+            case repeat of
+                Once ->
+                    patternToTest.slice symbols.length
+
+                Infinite ->
+                    upToGroupEndHelp (patternToTest.slice symbols.length) symbols repeat
+        else
+            patternToTest
+    else
+        let
+            patterns: List (List string)
+            patterns =
+                possiblePatterns symbols
+
+            findFirstMatch: List (List string) -> Maybe.Maybe (List string)
+            findFirstMatch xs =
+                case xs of
+                    [] ->
+                        Nothing
+
+                    x :: rest ->
+                        if doesPatternMatch patternToTest `${x.join("")}` then
+                            Just { value: patternToTest.slice symbols.length }
+                        else
+                            findFirstMatch rest
+
+                    default ->
+                        Nothing
+
+            firstMatch: Maybe.Maybe (List string)
+            firstMatch =
+                findFirstMatch patterns
+        in
+            case firstMatch of
+                Nothing ->
+                    patternToTest
+
+                Just { value } ->
+                    case repeat of
+                        Once ->
+                            value
+
+                        Infinite ->
+                            upToGroupEndHelp value symbols repeat
+
+upToGroupEnd: List string -> List Symbols -> RepeatPattern -> List string
+upToGroupEnd patternToTest symbols repeat =
+    upToGroupEndHelp patternToTest symbols repeat
+
+validateHelp: List string -> List Symbols -> Result
+validateHelp patternToTest symbols =
+    case symbols of
+        [] ->
+            if patternToTest.length == 0 then
+                Ok { value: "Passed" }
+            else
+                Err { error: `More symbols than expected: ${patternToTest}` }
+
+        currentSymbol :: rest ->
+            case patternToTest of
+                [] ->
+                    case currentSymbol of
+                        Group { repeat } ->
+                            validateHelp patternToTest rest
+
+                        default ->
+                            Err { error: `More symbols expected: ${symbols} against pattern ${currentSymbol}` }
+
+                headChar :: restOfChars ->
+                    case currentSymbol of
+                        Symbol { symbol } ->
+                            if headChar == symbol then
+                                validateHelp restOfChars rest
+                            else
+                                Err { error: `Expected ${symbol} but got ${headChar}` }
+
+                        Group { symbols, repeat } ->
+                            validateHelp (upToGroupEnd patternToTest symbols repeat) rest
+
+                        Either { left, right } ->
+                            case validateHelp patternToTest left of
+                                Ok ->
+                                    Ok { value: "Passed" }
+
+                                Err ->
+                                    case validateHelp patternToTest right of
+                                        Ok ->
+                                            Ok { value: "Passed" }
+
+                                        default ->
+                                            Err { error: `Expected either ${symbolsToString(left)} or ${symbolsToString(right)} but got ${patternToTest.join("")}` }
+
+                default ->
+                    Err { error: `Unexpected char pattern within validate ${patternToTest}` }
+
+        default ->
+            Err { error: "Unexpected symbol pattern within validate" }
+
+validate: string -> string -> Result
+validate patternToTest patternDefinition =
+    let
+        symbols: List Symbols
+        symbols =
+            parse patternDefinition
+    in
+        validateHelp (patternToTest.split "") symbols

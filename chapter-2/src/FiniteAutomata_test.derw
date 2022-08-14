@@ -1,0 +1,379 @@
+import "../derw-packages/derw-lang/stdlib/src/Test" as Test
+import "./FiniteAutomata" as FA exposing ( OpenParens, CloseParens, Star, Char, Symbol, Group, Infinite, Once, Add, Whitespace, Either )
+
+testSimpleTokens: void -> void
+testSimpleTokens _0 =
+    Test.equals [
+        Char { char: "0" },
+        Char { char: "0" },
+        Char { char: "1" }
+    ] (FA.tokenize "001")
+
+testRepeatingPatternTokens: void -> void
+testRepeatingPatternTokens _0 =
+    Test.equals [
+        Char { char: "0" },
+        Char { char: "0" },
+        Char { char: "1" },
+        OpenParens,
+        Char { char: "1" },
+        Char { char: "0" },
+        Char { char: "1" },
+        CloseParens,
+        Star,
+        Char { char: "0" },
+        Char { char: "1" }
+    ] (FA.tokenize "001(101)*01")
+
+testRepeatingPatternAddTokens: void -> void
+testRepeatingPatternAddTokens _0 =
+    Test.equals [
+        Char { char: "0" },
+        Char { char: "0" },
+        Char { char: "1" },
+        OpenParens,
+        Char { char: "1" },
+        Char { char: "0" },
+        Char { char: "1" },
+        CloseParens,
+        Star,
+        Char { char: "0" },
+        Char { char: "1" },
+        Whitespace,
+        Add,
+        Whitespace,
+        Char { char: "1" },
+        Char { char: "1" },
+        Char { char: "0" },
+        OpenParens,
+        Char { char: "0" },
+        Char { char: "1" },
+        Char { char: "0" },
+        CloseParens,
+        Star,
+        Char { char: "1" },
+        Char { char: "0" }
+    ] (FA.tokenize "001(101)*01 + 110(010)*10")
+
+testAddToken: void -> void
+testAddToken _0 =
+    Test.equals [
+        Char { char: "0" },
+        Whitespace,
+        Add,
+        Whitespace,
+        Char { char: "1" }
+    ] (FA.tokenize "0 + 1")
+
+testBookExampleToken: void -> void
+testBookExampleToken _0 =
+    Test.equals [
+        OpenParens,
+        Char { char: "a" },
+        Char { char: "b" },
+        CloseParens,
+        Star,
+        OpenParens,
+        Char { char: "a" },
+        Whitespace,
+        Add,
+        Whitespace,
+        Char { char: "b" },
+        CloseParens,
+        Star
+    ] (FA.tokenize "(ab)*(a + b)*")
+
+testSplitOnToplevelAdd: void -> void
+testSplitOnToplevelAdd _0 =
+    Test.equals {
+        left: [
+        Char { char: "0" },
+        Char { char: "0" },
+        Char { char: "1" }
+    ],
+        right: [ ]
+    } (FA.tokenize "001"
+        |> FA.splitOnToplevelAdd)
+
+testSplitOnToplevelAddAdd: void -> void
+testSplitOnToplevelAddAdd _0 =
+    Test.equals {
+        left: [
+        Char { char: "0" },
+        Char { char: "0" },
+        Char { char: "1" },
+        Whitespace
+    ],
+        right: [
+        Whitespace,
+        Char { char: "1" },
+        Char { char: "1" },
+        Char { char: "0" }
+    ]
+    } (FA.tokenize "001 + 110"
+        |> FA.splitOnToplevelAdd)
+
+testSplitOnToplevelAddAddNested: void -> void
+testSplitOnToplevelAddAddNested _0 =
+    Test.equals {
+        left: [
+        OpenParens,
+        Char { char: "0" },
+        Whitespace,
+        Add,
+        Whitespace,
+        Char { char: "1" },
+        CloseParens,
+        Star
+    ],
+        right: [ ]
+    } (FA.tokenize "(0 + 1)*"
+        |> FA.splitOnToplevelAdd)
+
+testSplitOnToplevelAddAddNestedPlus: void -> void
+testSplitOnToplevelAddAddNestedPlus _0 =
+    Test.equals {
+        left: [
+        OpenParens,
+        Char { char: "0" },
+        Whitespace,
+        Add,
+        Whitespace,
+        Char { char: "1" },
+        CloseParens,
+        Star,
+        Whitespace
+    ],
+        right: [
+        Whitespace,
+        OpenParens,
+        Char { char: "0" },
+        Whitespace,
+        Add,
+        Whitespace,
+        Char { char: "1" },
+        CloseParens,
+        Star
+    ]
+    } (FA.tokenize "(0 + 1)* + (0 + 1)*"
+        |> FA.splitOnToplevelAdd)
+
+testSimpleParse: void -> void
+testSimpleParse _0 =
+    Test.equals [
+        Symbol { symbol: "0" },
+        Symbol { symbol: "0" },
+        Symbol { symbol: "1" }
+    ] (FA.parse "001")
+
+testRepeatingPatternParse: void -> void
+testRepeatingPatternParse _0 =
+    Test.equals [
+        Symbol { symbol: "0" },
+        Symbol { symbol: "0" },
+        Symbol { symbol: "1" },
+        Group {
+            symbols: [
+            Symbol { symbol: "1" },
+            Symbol { symbol: "0" },
+            Symbol { symbol: "1" }
+        ],
+            repeat: Infinite
+        },
+        Symbol { symbol: "0" },
+        Symbol { symbol: "1" }
+    ] (FA.parse "001(101)*01")
+
+testAddParse: void -> void
+testAddParse _0 =
+    Test.equals [ Either {
+        left: [ Symbol { symbol: "0" } ],
+        right: [ Symbol { symbol: "1" } ]
+    } ] (FA.parse "0 + 1")
+
+testRepeatingPatternAddParse: void -> void
+testRepeatingPatternAddParse _0 =
+    Test.equals [ Either {
+        left: [
+        Symbol { symbol: "0" },
+        Symbol { symbol: "0" },
+        Symbol { symbol: "1" },
+        Group {
+            symbols: [
+            Symbol { symbol: "1" },
+            Symbol { symbol: "0" },
+            Symbol { symbol: "1" }
+        ],
+            repeat: Infinite
+        },
+        Symbol { symbol: "0" },
+        Symbol { symbol: "1" }
+    ],
+        right: [
+        Symbol { symbol: "1" },
+        Symbol { symbol: "1" },
+        Symbol { symbol: "0" },
+        Group {
+            symbols: [
+            Symbol { symbol: "0" },
+            Symbol { symbol: "1" },
+            Symbol { symbol: "0" }
+        ],
+            repeat: Infinite
+        },
+        Symbol { symbol: "1" },
+        Symbol { symbol: "0" }
+    ]
+    } ] (FA.parse "001(101)*01 + 110(010)*10")
+
+testNestedAddParse: void -> void
+testNestedAddParse _0 =
+    Test.equals [ Group {
+        symbols: [ Either {
+        left: [ Symbol { symbol: "0" } ],
+        right: [ Symbol { symbol: "1" } ]
+    } ],
+        repeat: Infinite
+    } ] (FA.parse "(0 + 1)*")
+
+testBookExampleParse: void -> void
+testBookExampleParse _0 =
+    Test.equals [
+        Group {
+            symbols: [
+            Symbol { symbol: "a" },
+            Symbol { symbol: "b" }
+        ],
+            repeat: Infinite
+        },
+        Group {
+            symbols: [ Either {
+            left: [ Symbol { symbol: "a" } ],
+            right: [ Symbol { symbol: "b" } ]
+        } ],
+            repeat: Infinite
+        }
+    ] (FA.parse "(ab)*(a + b)*")
+
+testSimpleValidate: void -> void
+testSimpleValidate _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "001" "001")
+
+testSimpleValidateInvalid: void -> void
+testSimpleValidateInvalid _0 =
+    Test.equals (FA.Err { error: "Expected 0 but got 1" }) (FA.validate "100" "001")
+
+testRepeatingPatternValidateInvalid: void -> void
+testRepeatingPatternValidateInvalid _0 =
+    Test.equals (FA.Err { error: "Expected 0 but got 1" }) (FA.validate "00110101" "001(10)*01")
+
+testRepeatingPatternValidate: void -> void
+testRepeatingPatternValidate _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "00110101" "001(101)*01")
+
+testRepeatingPatternValidateComplex: void -> void
+testRepeatingPatternValidateComplex _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "000101010100" "00(01)*00")
+
+testRepeatingPatternValidateComplexInvalid: void -> void
+testRepeatingPatternValidateComplexInvalid _0 =
+    Test.equals (FA.Err { error: "Expected 0 but got 1" }) (FA.validate "000101010100" "00(10)*00")
+
+testAddValidate: void -> void
+testAddValidate _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "0" "0 + 1")
+
+testAddValidateA: void -> void
+testAddValidateA _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "1" "0 + 1")
+
+testAddValidateB: void -> void
+testAddValidateB _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "0" "0 + 11")
+
+testAddValidateC: void -> void
+testAddValidateC _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "11" "0 + 11")
+
+testAddValidateInvalid: void -> void
+testAddValidateInvalid _0 =
+    Test.equals (FA.Err { error: "Expected either 0 or 1 but got 11" }) (FA.validate "11" "0 + 1")
+
+testRepeatingPatternValidateAdd: void -> void
+testRepeatingPatternValidateAdd _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "00110101" "001(101)*01 + 110(010)*10")
+
+testRepeatingPatternValidateAddA: void -> void
+testRepeatingPatternValidateAddA _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "11001010" "001(101)*01 + 110(010)*10")
+
+testRepeatingPatternValidateAddB: void -> void
+testRepeatingPatternValidateAddB _0 =
+    Test.equals (FA.Err { error: "Expected either 001(101)*01 or 110(010)*10 but got 11111111" }) (FA.validate "11111111" "001(101)*01 + 110(010)*10")
+
+testBookExampleValidateA: void -> void
+testBookExampleValidateA _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "aba" "(ab)*(a + b)*")
+
+testBookExampleValidateB: void -> void
+testBookExampleValidateB _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "abb" "(ab)*(a + b)*")
+
+testBookExampleValidateC: void -> void
+testBookExampleValidateC _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "" "(ab)*(a + b)*")
+
+testBookExampleValidateD: void -> void
+testBookExampleValidateD _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "a" "(ab)*(a + b)*")
+
+testBookExampleValidateE: void -> void
+testBookExampleValidateE _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "b" "(ab)*(a + b)*")
+
+testBookExampleValidateF: void -> void
+testBookExampleValidateF _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "aa" "(ab)*(a + b)*")
+
+testBookExampleValidateG: void -> void
+testBookExampleValidateG _0 =
+    Test.equals (FA.Ok { value: "Passed" }) (FA.validate "bb" "(ab)*(a + b)*")
+
+testBookExampleValidateInvalid: void -> void
+testBookExampleValidateInvalid _0 =
+    Test.equals (FA.Err { error: "More symbols than expected: 0" }) (FA.validate "0" "(ab)*(a + b)*")
+
+testMergePattern: void -> void
+testMergePattern _0 =
+    Test.equals [
+        [
+            "a",
+            "b",
+            "0"
+        ],
+        [
+            "a",
+            "b",
+            "1"
+        ]
+    ] (FA.mergePattern [
+        "a",
+        "b"
+    ] [
+        [ "0" ],
+        [ "1" ]
+    ])
+
+testPossiblePatternsA: void -> void
+testPossiblePatternsA _0 =
+    Test.equals [ [ "a" ] ] (FA.possiblePatterns [ Symbol { symbol: "a" } ])
+
+testPossiblePatternsB: void -> void
+testPossiblePatternsB _0 =
+    Test.equals [
+        [ "a" ],
+        [ "b" ]
+    ] (FA.possiblePatterns [ Either {
+        left: [ Symbol { symbol: "a" } ],
+        right: [ Symbol { symbol: "b" } ]
+    } ])
