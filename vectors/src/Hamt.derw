@@ -1,0 +1,16 @@
+branchSize: number
+branchSize =
+    32
+
+type HamtNode a =
+    Subtree { tree: Tree a }
+    | Leaf { children: List a }
+
+type Tree a =
+    TreeNode { elements: List (HamtNode a) }
+
+type Hamt a =
+    HamtArray { length: number,
+        start: number,
+        tree: Tree a,
+        tail: List a }
