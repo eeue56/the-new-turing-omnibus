@@ -1,0 +1,97 @@
+import "../derw-packages/derw-lang/stdlib/src/Test" as Test
+import "./BinaryTree" as BinaryTree
+
+testEmptyList: void -> void
+testEmptyList _0 =
+    Test.equals [ ] (BinaryTree.fromList [ ]
+        |> BinaryTree.toList)
+
+testNumberList: void -> void
+testNumberList _0 =
+    Test.equals [
+        1,
+        2,
+        3
+    ] (BinaryTree.fromList [
+        1,
+        2,
+        3
+    ]
+        |> BinaryTree.toList)
+
+testNumberIsSortedList: void -> void
+testNumberIsSortedList _0 =
+    Test.equals [
+        1,
+        2,
+        3
+    ] (BinaryTree.fromList [
+        3,
+        2,
+        1
+    ]
+        |> BinaryTree.toList)
+
+testNumberWithDuplicatesList: void -> void
+testNumberWithDuplicatesList _0 =
+    Test.equals [
+        1,
+        2,
+        2,
+        3
+    ] (BinaryTree.fromList [
+        1,
+        2,
+        2,
+        3
+    ]
+        |> BinaryTree.toList)
+
+testNumberRemoveList: void -> void
+testNumberRemoveList _0 =
+    Test.equals [
+        1,
+        3
+    ] (BinaryTree.fromList [
+        1,
+        2,
+        3
+    ]
+        |> BinaryTree.remove 2
+        |> BinaryTree.toList)
+
+testNumberRemoveRootList: void -> void
+testNumberRemoveRootList _0 =
+    Test.equals [
+        2,
+        3
+    ] (BinaryTree.fromList [
+        1,
+        2,
+        3
+    ]
+        |> BinaryTree.remove 1
+        |> BinaryTree.toList)
+
+testNumberMapList: void -> void
+testNumberMapList _0 =
+    Test.equals [
+        10,
+        20,
+        30
+    ] (BinaryTree.fromList [
+        1,
+        2,
+        3
+    ]
+        |> BinaryTree.map (\x -> x * 10)
+        |> BinaryTree.toList)
+
+testNumberFoldlList: void -> void
+testNumberFoldlList _0 =
+    Test.equals 6 (BinaryTree.fromList [
+        1,
+        2,
+        3
+    ]
+        |> BinaryTree.foldl (\x xs -> x + xs) 0)

@@ -1,5 +1,7 @@
 {
     "name": "vectors",
     "exposing": [],
-    "dependencies": {}
+    "dependencies": {
+        "derw-lang/stdlib": "main"
+    }
 }

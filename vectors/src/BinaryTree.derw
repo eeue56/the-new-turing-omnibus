@@ -1,0 +1,159 @@
+import "../derw-packages/derw-lang/stdlib/src/List" as List
+
+exposing (BinaryTree, insert, remove, fromList, toList, map, foldl)
+
+type BinaryTree a =
+    Empty
+    | BinaryTreeNode { left: BinaryTree a,
+        right: BinaryTree a,
+        value: a,
+        count: number }
+
+insert: a -> BinaryTree a -> BinaryTree a
+insert newValue tree =
+    case tree of
+        Empty ->
+            BinaryTreeNode {
+                left: Empty,
+                right: Empty,
+                value: newValue,
+                count: 1
+            }
+
+        BinaryTreeNode { left, right, value, count } ->
+            if newValue == value then
+                BinaryTreeNode {
+                    left: left,
+                    right: right,
+                    value: value,
+                    count: count + 1
+                }
+            else
+                if value < newValue then
+                    BinaryTreeNode {
+                        left: left,
+                        right: insert newValue right,
+                        value: value,
+                        count: count
+                    }
+                else
+                    BinaryTreeNode {
+                        left: insert newValue left,
+                        right: right,
+                        value: value,
+                        count: count
+                    }
+
+remove: a -> BinaryTree a -> BinaryTree a
+remove newValue tree =
+    case tree of
+        Empty ->
+            Empty
+
+        BinaryTreeNode { left, right, value, count } ->
+            if value == newValue then
+                if count < 2 then
+                    BinaryTreeNode {
+                        left: left,
+                        right: right,
+                        value: value,
+                        count: 0
+                    }
+                else
+                    BinaryTreeNode {
+                        left: left,
+                        right: right,
+                        value: value,
+                        count: count - 1
+                    }
+            else
+                if newValue < value then
+                    BinaryTreeNode {
+                        left: remove newValue left,
+                        right: right,
+                        value: value,
+                        count: count
+                    }
+                else
+                    BinaryTreeNode {
+                        left: left,
+                        right: remove newValue right,
+                        value: value,
+                        count: count
+                    }
+
+map: (a -> b) -> BinaryTree a -> BinaryTree b
+map fn tree =
+    case tree of
+        Empty ->
+            Empty
+
+        BinaryTreeNode { left, right, value, count } ->
+            BinaryTreeNode {
+                left: map fn left,
+                right: map fn right,
+                value: fn value,
+                count: count
+            }
+
+foldl: (a -> b -> b) -> b -> BinaryTree a -> b
+foldl fn xs tree =
+    case tree of
+        Empty ->
+            xs
+
+        BinaryTreeNode { left, right, value, count } ->
+            let
+                allLefts: b
+                allLefts =
+                    foldl fn xs left
+
+                applyCurrent: number -> b -> b
+                applyCurrent count xs =
+                    if count == 0 then
+                        xs
+                    else
+                        applyCurrent (count - 1) (fn value xs)
+
+                withCurrent: b
+                withCurrent =
+                    applyCurrent count allLefts
+
+                allRights: b
+                allRights =
+                    foldl fn withCurrent right
+            in
+                allRights
+
+fromList: List a -> BinaryTree a
+fromList list =
+    List.foldl (\value tree -> insert value tree) Empty list
+
+toList: BinaryTree a -> List a
+toList tree =
+    case tree of
+        Empty ->
+            [ ]
+
+        BinaryTreeNode { left, right, value, count } ->
+            let
+                generatedLeft: List a
+                generatedLeft =
+                    toList left
+
+                generatedRight: List a
+                generatedRight =
+                    toList right
+
+                generatedCurrentHelp: number -> List a
+                generatedCurrentHelp count =
+                    if count == 0 then
+                        [ ]
+                    else
+                        value :: generatedCurrentHelp (count - 1)
+
+                generatedCurrent: List a
+                generatedCurrent =
+                    generatedCurrentHelp count
+            in
+                List.append (List.append generatedLeft generatedCurrent) generatedRight
